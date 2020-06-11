@@ -1,5 +1,5 @@
 # g403-GUI-control
-Control the logitech's g403 LED and DPI on linux via GUI
+Control logitech g403 LEDs and DPI on Linux via GUI.
 Sync your colours and set default DPI options.
 
 ## Dependency
@@ -7,7 +7,7 @@ Sync your colours and set default DPI options.
 Ubuntu:
 
 ```bash
-sudo apt-get install libusb-1.0-dev
+sudo apt-get install libusb-1.0.0-dev
 ```
 
 ## Compile
@@ -24,16 +24,16 @@ sudo ./g403hub
 ```
 
 ### Note
-The program isn't completed yet. 
-It requires admin privileges
+The program is not complete yet.
+It also requires admin privileges
 
 ### Completed features
-- Set static LED colour for the logo
+- Set the static LED colour for the logo
  
 ### Missing features
 
 - Set custom LED colours
-- Set mode either cycle, breathe or static
-- Set LED for either logo or scrollwheel
+- Set the cycle, breathing, or static mode
+- Set the LED for the logo or scroll wheel
 - Set DPI
 - Comprehensive GUI
