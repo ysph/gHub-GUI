@@ -5,27 +5,26 @@
 static int ID_VENDOR  = 0x046d;
 static int ID_PRODUCT = 0xc083;
 
-static struct libusb_device_handle *devh = NULL;
+static libusb_device_handle *devh = NULL;
+libusb_context *global_context;
+
 int returnCode;
 
-void CloseDevice(void) 
-{
+void CloseDevice(void) {
     if (devh)
-            libusb_close(devh);
+		libusb_close(devh);
     libusb_exit(NULL);
 }
 
 void DetachKernel(void) {
-    for (int interfaces = 0; interfaces < 2; interfaces++) 
-    {
-        if (libusb_kernel_driver_active(devh, interfaces)) 
-        {
-            libusb_detach_kernel_driver(devh, interfaces);
+    for (int interface = 0; interface < 2; interface++) {
+        if (libusb_kernel_driver_active(devh, interface)) {
+            libusb_detach_kernel_driver(devh, interface);
         }
         
-        returnCode = libusb_claim_interface(devh, interfaces);
-        if (returnCode < 0) 
-        {
+        returnCode = libusb_claim_interface(devh, interface);
+        
+        if (returnCode < 0) {
             fprintf(stderr, "Error claiming interface: %s\n",
                     libusb_error_name(returnCode));
             CloseDevice();
@@ -35,54 +34,107 @@ void DetachKernel(void) {
 }
 
 void AttachKernel(void) {
-    for (int interfaces = 0; interfaces < 2; interfaces++) 
-    {
-        if (!libusb_kernel_driver_active(devh, interfaces)) 
-        {
-            libusb_attach_kernel_driver(devh, interfaces);
+    for (int interface = 0; interface < 2; interface++) {
+    	libusb_release_interface(devh, interface);
+    	
+        if (!libusb_kernel_driver_active(devh, interface)) {
+            libusb_attach_kernel_driver(devh, interface);
         }
 	}
 }
 
-int main(int argc, char *argv[])
-{
-    int wIndex = 0x01;
+int getDevice(void) {
+	libusb_device **list;
+	struct libusb_device_descriptor desc;
+	
+	int i;
+	int found = 0;
+	
+	ssize_t count = libusb_get_device_list(global_context, &list);
+	
+	for (i = 0; i < count; i++) {
+		libusb_device *device = list[i];
+		
+		if (!libusb_get_device_descriptor(device, &desc)) {
+			if ((desc.idVendor == ID_VENDOR) && (desc.idProduct == ID_PRODUCT)) {
+			
+				returnCode = libusb_open(device, &devh);
+				if (returnCode < 0) {
+					fprintf(stderr, "Error opening device: %s\n", libusb_error_name(returnCode));
+				}
+				
+				found = 1;
+				break;
+			}
+		}
+	}
+	
+	if (!found) {
+	 	return found;
+	}
+	
+	libusb_free_device_list(list, 1);
+	
+	return 1;
+}
+
+int main(int argc, char *argv[]) {
+	int bmRequestType = 0x21; // type and recipient: 0b00100001
+	int bRequest = 0x09; // type of request: set_report
+    int wValue = 0x0211; // report type and id: vendor, 0x11 
+    int wIndex = 0x01; // report type: input
     
-    // changes only logo, has implicit values
-	unsigned char data[20] = { 0x11, 0xff, 0x0e, 0x3b, 0x01, 0x01, 0xf7, 
-	                           0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 
-	                           0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-	                               
+    int source, type, R, G, B;
+
+	source = 0x01; // 0 - scrollwheel, 1 - logo
+	type = 0x01; // static
+    R = 0xff;
+    G = 0xff;
+    B = 0x00;
+    
+    // only static change is implemented
+	unsigned char data[20] = { 0x11, 0xff, 0x0e, 0x3b, source, type, R, G, B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	                                                          
     // init
     returnCode = libusb_init(NULL);
+    
+    libusb_set_option(global_context, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_ERROR);
+    
     if (returnCode < 0) {
         fprintf(stderr, "Error initializing libusb: %s\n", libusb_error_name(returnCode));
+        
         return returnCode;
     }
     
-    // find device
+    // find device 
     devh = libusb_open_device_with_vid_pid(NULL, ID_VENDOR, ID_PRODUCT);
+    
     if (!devh) {
-        fprintf(stderr, "Error finding the g403 prodigy mouse.\n");
-        CloseDevice();
-        return returnCode;
+    	returnCode = getDevice();
+    	
+    	if (!returnCode) {
+        	fprintf(stderr, "Error: Cannot find the g403 prodigy mouse.\n");
+        	CloseDevice();
+        	
+        	return returnCode;
+    	}
     }
     
-    /* detach if kernel driver is active
+    /* detach kernel
         &
        claim an interface on a given device handle */
     DetachKernel();
-    
-    returnCode = libusb_control_transfer(devh, 0x21, 0x09, 0x0211, wIndex, 
-                                         data, sizeof(data), 0);
+                                         
+    returnCode = libusb_control_transfer(devh, bmRequestType, bRequest, wValue, wIndex, 
+                                         data, sizeof(data), 2000);
     if (returnCode < 0) {
         fprintf(stderr, "Error during control transfer: %s\n",
-                libusb_error_name(returnCode));
+		libusb_error_name(returnCode));
     }
     
-    // release an interface previously claimed with libusb_claim_interface()
-	libusb_release_interface(devh, 0);
-	
+    /* release the interface previously claimed
+     	&
+       attach kernel */
 	AttachKernel();
 	
     return 0;
