@@ -1,5 +1,5 @@
 # g403-GUI-control
-Control logitech g403 LEDs and DPI on Linux via GUI.
+Control logitech g403 LEDs and DPI on Linux via GUI.  
 Sync your colours and set default DPI options.
 
 ## Dependency
@@ -7,7 +7,7 @@ Sync your colours and set default DPI options.
 Ubuntu:
 
 ```bash
-sudo apt-get install libusb-1.0.0-dev
+sudo apt-get install libusb-1.0-0-dev
 ```
 
 ## Compile
@@ -25,37 +25,36 @@ sudo ./g403hub
 
 ## TroubleShooting
 
-### My mouse doesn't work after executing
+### Mouse stopped working after execution
+The problem is that the OS has failed to attach driver (see "can't add hid device" in dmesg)  
+To solve that, either try to execute program again or switch the port.
 
-The problem is the race condition after attaching the kernel ("can't add hid device" in dmesg)
-To solve it, either execute program again or create a rule in /etc/udev/rules.d/:
+### Can I run the program without root privilege?
+
+create a rule in /etc/udev/rules.d/:
 
 ```bash
-echo 'KERNEL=="hidraw*", SUBSYSTEM=="hidraw", MODE="0664", GROUP="plugdev"' | sudo tee /etc/udev/rules.d/99-hidraw-permission.rules
+printf 'KERNEL=="hidraw*", SUBSYSTEM=="hidraw", MODE="0664", GROUP="plugdev"\nSUBSYSTEM=="usb", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c083", GROUP="ubuntu", MODE="066"\nSUBSYSTEM=="usb_DEVICE", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c083", GROUP="ubuntu", MODE="066"' | sudo tee /etc/udev/rules.d/99-hidraw-permission.rules
 ```
 
 If rules fail to reload automatically:
 
 ```bash
-udevadm control --reload
+sudo udevadm control --reload
 ```
 
 To manually force udev to trigger your rules:
 
 ```bash
-udevadm trigger
+sudo udevadm trigger
 ```
+Reboot also may be needed.  
 
-Reboot also may be needed.
-
-### Can I run the program without root privilege?
-
-Use udev rules such as in problem above or create other rules:
-
-[udev homepage](http://www.kernel.org/pub/linux/utils/kernel/hotplug/udev/udev.html)
-[Debian's udev overview](http://wiki.debian.org/udev)
-[Arch's udev overview](https://wiki.archlinux.org/index.php/udev)
-[Writing udev rules](http://www.reactivated.net/udevrules.php) 
+Links regarding udev rules:  
+[udev homepage](http://www.kernel.org/pub/linux/utils/kernel/hotplug/udev/udev.html)  
+[Debian's udev overview](http://wiki.debian.org/udev)  
+[Arch's udev overview](https://wiki.archlinux.org/index.php/udev)  
+[Writing udev rules](http://www.reactivated.net/udevrules.php)  
 [Ask about udev on the forum](http://vger.kernel.org/vger-lists.html#linux-hotplug)  
 
 ## Miscellaneous
