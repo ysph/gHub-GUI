@@ -5,12 +5,20 @@
 #define LIBUSB_LOG_LEVEL_ERROR	1
 
 #define ID_VENDOR				0x046d
-#define ID_PRODUCT				0xc083
+#define ID_PRODUCT_WIRELESS		0xc082
+#define ID_PRODUCT_WIRED		0xc083
 #define ID_PRODUCT_BLUETOOTH	0xc539
+
 static libusb_device_handle *devh = NULL;
 libusb_context *global_context;
 
-int returnCode;
+int returnCode, productType;
+static int bmRequestType = 0x21; // type and recipient: 0b00100001
+static int bRequest = 0x09; // type of request: set_report
+static int wValue = 0x0211; // report type and id: output, 0x11 
+int wIndex;
+
+static int source, type, R, G, B;
 
 void CloseDevice(void) {
 	if (devh)
@@ -19,13 +27,11 @@ void CloseDevice(void) {
 }
 
 void DetachKernel(void) {
-	int control = 1; // 0 - data
-	
-	if (libusb_kernel_driver_active(devh, control)) {
-		libusb_detach_kernel_driver(devh, control);
+	if (libusb_kernel_driver_active(devh, wIndex)) {
+		libusb_detach_kernel_driver(devh, wIndex);
 	}
 
-	returnCode = libusb_claim_interface(devh, control);
+	returnCode = libusb_claim_interface(devh, wIndex);
 	
 	if (returnCode < 0) {
 		fprintf(stderr, "Error claiming interface: %s\n",
@@ -37,11 +43,10 @@ void DetachKernel(void) {
 }
 
 void AttachKernel(void) {
-	int control = 1; 
-	libusb_release_interface(devh, control);
+	libusb_release_interface(devh, wIndex);
 
-	if (!libusb_kernel_driver_active(devh, control)) {
-		libusb_attach_kernel_driver(devh, control);
+	if (!libusb_kernel_driver_active(devh, wIndex)) {
+		libusb_attach_kernel_driver(devh, wIndex);
 	}
 }
 
@@ -51,15 +56,28 @@ int getDevice(void) {
 	
 	int i;
 	int found = 0;
-	
+
 	ssize_t count = libusb_get_device_list(global_context, &list);
 	
 	for (i = 0; i < count; i++) {
 		libusb_device *device = list[i];
 		
 		if (!libusb_get_device_descriptor(device, &desc)) {
-			if ((desc.idVendor == ID_VENDOR) && (desc.idProduct == ID_PRODUCT) || (desc.idProduct == ID_PRODUCT_BLUETOOTH)) {
-			
+			if (desc.idVendor == ID_VENDOR) {
+				switch (desc.idProduct) {
+					case ID_PRODUCT_WIRED:
+						productType = 0;
+						break;
+					case ID_PRODUCT_WIRELESS:
+						productType = 1;
+						break;
+					case ID_PRODUCT_BLUETOOTH:
+						productType = 1;
+						break;
+					default:
+						continue;
+				}
+				
 				returnCode = libusb_open(device, &devh);
 				if (returnCode < 0) {
 					fprintf(stderr, "Error opening device: %s\n", libusb_error_name(returnCode));
@@ -81,25 +99,8 @@ int getDevice(void) {
 }
 
 int main(int argc, char *argv[]) {
-	int bmRequestType = 0x21; // type and recipient: 0b00100001
-	int bRequest = 0x09; // type of request: set_report
-	int wValue = 0x0211; // report type and id: vendor, 0x11 
-	int wIndex = 0x01; // report type: input
-
-	int source, type, R, G, B;
-
-	source = 0x01; // 0 - scrollwheel, 1 - logo
-	type = 0x01; // static
-	R = 0x00;
-	G = 0x77;
-	B = 0xff;
-
-	// only static change is implemented
-	unsigned char data[20] = {0x11, 0xff, 0x0e, 0x3b, source, type, R, G, B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
 	// init
 	returnCode = libusb_init(NULL);	
-
 
 	#if defined(LIBUSB_API_VERSION) && (LIBUSB_API_VERSION >= 0x01000106) // >=1.0.22
 		libusb_set_option(global_context, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_ERROR);
@@ -112,13 +113,11 @@ int main(int argc, char *argv[]) {
 
 		return returnCode;
 	}
-
 	// find device 
-	devh = libusb_open_device_with_vid_pid(NULL, ID_VENDOR, ID_PRODUCT);
+	devh = libusb_open_device_with_vid_pid(NULL, ID_VENDOR, ID_PRODUCT_WIRED);
 
 	if (!devh) {
 		returnCode = getDevice();
-
 		if (!returnCode) {
 			fprintf(stderr, "Error: Cannot find the g403 prodigy mouse.\n");
 			CloseDevice();
@@ -126,7 +125,33 @@ int main(int argc, char *argv[]) {
 			return returnCode;
 		}
 	}
+	int devByte[4];
 
+	switch (productType) {
+		case 0:
+			wIndex = 1;
+			devByte[0] = 0x11;
+			devByte[1] = 0xff;
+			devByte[2] = 0x0e;
+			devByte[3] = 0x3b;
+			break;
+		case 1:
+			wIndex = 2;
+			devByte[0] = 0x11;
+			devByte[1] = 0xff;
+			devByte[2] = 0x18;
+			devByte[3] = 0x3a;
+	}
+
+	source = 0x01; // 0 - scrollwheel, 1 - logo
+	type = 0x01; // static
+	R = 0xff;
+	G = 0x00;
+	B = 0xff;
+	
+	// only static change is implemented
+	unsigned char data[20] = {devByte[0], devByte[1], devByte[2], devByte[3], source, type, R, G, B, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	
     /* detach kernel
         &
        claim an interface on a given device handle */
@@ -134,7 +159,7 @@ int main(int argc, char *argv[]) {
 
 	returnCode = libusb_control_transfer(devh, bmRequestType, bRequest, wValue, 
 										 wIndex, data, sizeof(data), 2000);
-
+	
 	if (returnCode < 0) {
 		fprintf(stderr, "Error during control transfer: %s\n",
 		libusb_error_name(returnCode));
@@ -146,7 +171,7 @@ int main(int argc, char *argv[]) {
 	AttachKernel();
 	CloseDevice();
 	 
-	printf("Now, the color of your logo is #%02x%02x%02x\n",R,G,B);
+	if (returnCode >= 0) printf("Now, the color of your logo is #%02x%02x%02x\n",R,G,B);
 
 	return 0;
 }
