@@ -26,7 +26,7 @@ Item* available_head; // the list contains available devices
 //temporary
 int temp_id;
 
-void CloseDevice(void) {
+void CloseDeviceAndExit(void) {
 	if (devh)
 		libusb_close(devh);
 	libusb_exit(NULL);
@@ -43,7 +43,7 @@ void DetachKernel(void) {
 		fprintf(stderr, "Error: Cannot claim interface: %s\n",
 		libusb_error_name(returnCode));
 
-		CloseDevice();
+		CloseDeviceAndExit();
 		return;
 	}
 }
@@ -142,7 +142,7 @@ int openDevice(void) {
 		&
 		attach kernel */
 	AttachKernel();
-	CloseDevice();
+	CloseDeviceAndExit();
 
 	return EXIT_SUCCESS;
 }
@@ -160,7 +160,7 @@ int getDevice(Item* head) {
 		if (!libusb_get_device_descriptor(device, &desc)) {
 			if (desc.idProduct == ID_PRODUCT_UNIDENTIFIED) {
 				printf("Found wireless logitech device, but it's UNIDENTIFIED.\n");
-				printf("Consider upgrading the kernel to at least version of 5.2.\n Or use wired option of your mouse.\n\n");
+				printf("Consider upgrading the kernel to at least version of 5.2.\nOr use wired option of your mouse.\n\n");
 				continue;
 			}
 
@@ -244,7 +244,7 @@ int main(void) {
 	returnCode = getDevice(head);
 	if (!returnCode) {
 		fprintf(stderr, "Error: Cannot find any logitech mouse. %s\n", libusb_error_name(returnCode));
-		CloseDevice();
+		CloseDeviceAndExit();
 
 		return returnCode;
 	}
@@ -253,12 +253,12 @@ int main(void) {
 	if (returnCode == 2) {
 		deleteLinkedList(&head);
 		deleteLinkedList(&available_head);
-		CloseDevice();
+		CloseDeviceAndExit();
 		return EXIT_SUCCESS;
 	}
 	if (returnCode < 0) {
 		fprintf(stderr, "Error: Cannot operate logitech mouse. %s\n", libusb_error_name(returnCode));
-		CloseDevice();
+		CloseDeviceAndExit();
 		return EXIT_FAILURE;
 	}
 
@@ -282,6 +282,7 @@ int main(void) {
 
 	deleteLinkedList(&head);
 	deleteLinkedList(&available_head);
+	CloseDeviceAndExit();
 
 	return EXIT_SUCCESS;
 }
