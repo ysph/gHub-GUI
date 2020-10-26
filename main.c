@@ -142,7 +142,9 @@ int openDevice(void) {
 		&
 		attach kernel */
 	AttachKernel();
-	CloseDeviceAndExit();
+	
+	if (devh)
+		libusb_close(devh);
 
 	return EXIT_SUCCESS;
 }
@@ -282,7 +284,8 @@ int main(void) {
 
 	deleteLinkedList(&head);
 	deleteLinkedList(&available_head);
-	CloseDeviceAndExit();
+
+	libusb_exit(NULL);
 
 	return EXIT_SUCCESS;
 }
