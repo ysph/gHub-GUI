@@ -202,7 +202,7 @@ int main(void) {
 	// add known devices
 	Item* head = (Item*)malloc(size_of_Item);
 	head->next = NULL;
-	//pushItem(&head, 0xc092, "G102-G203 LIGHTSYNC", WIRED_OR_CABLE);
+	pushItem(&head, 0xc092, "G102-G203 LIGHTSYNC", WIRED_OR_CABLE, 0x0e);
 	pushItem(&head, 0xc084, "G203 Prodigy", WIRED_OR_CABLE, 0x0e);
 	pushItem(&head, 0xc083, "G403 Prodigy", WIRED_OR_CABLE, 0x0e);
 	//pushItem(&head, 0xc07f, "G302 Daedalus Prime", WIRED_OR_CABLE,);
