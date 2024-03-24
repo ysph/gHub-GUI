@@ -13,7 +13,7 @@ sudo apt-get install libusb-1.0-0-dev libx11-dev libgl-dev
 Fedora (38):
 
 ```bash
-sudo dnf install libusb1-devel libx11-devel mesa-libGL-devel
+sudo dnf install libusb1-devel libX11-devel mesa-libGL-devel
 ```
 
 ## Compile
